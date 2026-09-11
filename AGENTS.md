@@ -6,6 +6,15 @@ management and an emoji picker. It also **runs Raycast extensions** natively, in
 SwiftUI + AppKit, running as an accessory with no Dock icon (`LSUIElement`). Zero third-party
 dependencies.
 
+## Fork workflow
+
+- Work only on issues the user creates and selects in `fogrye/tinycast`. Do not browse, select,
+  comment on, or close issues in `abue-ammar/tinycast`.
+- Never open a pull request to, push to, fetch from, or otherwise act on the upstream repository.
+- Branch from `origin/dev` in a dedicated worktree. After validation, merge the work into `dev` and
+  push only `origin/dev`.
+- The user owns issue selection. Do not create issues or infer work from upstream activity.
+
 ## Posture: latest-only, always
 
 **Tinycast targets one macOS — the current stable release — and nothing else.** macOS 26+, the Xcode 26
