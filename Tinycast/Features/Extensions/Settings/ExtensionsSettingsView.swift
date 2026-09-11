@@ -512,14 +512,21 @@ private struct CommandRows: View {
 
     var body: some View {
         SettingsCardRow(title: command.title, detail: command.description, badge: badge) {
-            if command.mode.isSupported {
-                // Per command, not per extension: a shortcut has to land on one thing to run.
-                ShortcutRecorder(
-                    action: .extensionCommand(
-                        entryID: ExtensionCommandRef(
-                            extensionName: installed.manifest.name, commandName: command.name
-                        ).entryID),
-                    isQuiet: true)
+            VStack(alignment: .trailing, spacing: Theme.Spacing.xxs) {
+                AliasField(
+                    key: ExtensionCommandRef(
+                        extensionName: installed.manifest.name, commandName: command.name
+                    ).entryID,
+                    name: command.title)
+                if command.mode.isSupported {
+                    // Per command, not per extension: a shortcut has to land on one thing to run.
+                    ShortcutRecorder(
+                        action: .extensionCommand(
+                            entryID: ExtensionCommandRef(
+                                extensionName: installed.manifest.name, commandName: command.name
+                            ).entryID),
+                        isQuiet: true)
+                }
             }
         }
         // Indented under its command: at the same inset the association is reading order.
