@@ -147,6 +147,14 @@ final class AIChatCoordinator {
         palette.prepare(mode: .ai)
     }
 
+    /// Opens the adjacent saved chat in recency order.
+    func openAdjacentChat(_ offset: Int) {
+        guard let id = ChatHistoryNavigation.adjacent(
+            in: core.chatHistory.conversations, from: chat.session.id, offset: offset)
+        else { return }
+        openChat(id: id)
+    }
+
     func showHistory() {
         palette.prepare(mode: .aiHistory)
     }

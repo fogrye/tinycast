@@ -77,10 +77,12 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         if let pasteMonitor { NSEvent.removeMonitor(pasteMonitor) }
     }
 
-    /// The character a bare-⌘ chord names, through the ASCII layout so an IME cannot move it.
-    private static func commandCharacter(from event: NSEvent) -> String? {
+    /// The character a Command chord names, through ASCII so an IME cannot move it.
+    private static func commandCharacter(
+        from event: NSEvent, modifiers: NSEvent.ModifierFlags = .command
+    ) -> String? {
         guard !event.isARepeat,
-            event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command
+            event.modifierFlags.intersection([.command, .option, .control, .shift]) == modifiers
         else { return nil }
         return ASCIIKeyboardLayout.character(for: event)?.lowercased()
             ?? event.charactersIgnoringModifiers?.lowercased()
@@ -288,7 +290,28 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         installPasteMonitor()
         // Handled at the panel: the field editor or a missing main menu eats these first.
         panel.onCommandShortcut = { [weak self] event in
-            guard let self, Self.commandCharacter(from: event) != nil else { return false }
+            guard let self else { return false }
+            let command = Self.commandCharacter(from: event)
+            let commandShift = Self.commandCharacter(
+                from: event, modifiers: [.command, .shift])
+            if let shortcut =
+                command.flatMap({ AIChatShortcut.resolve(character: $0, hasShift: false) })
+                ?? commandShift.flatMap({ AIChatShortcut.resolve(character: $0, hasShift: true) })
+            {
+                guard self.core.palette.mode == .ai || self.core.palette.mode == .aiHistory else {
+                    return false
+                }
+                switch shortcut {
+                case .previousChat: self.core.aiChatCoordinator.openAdjacentChat(1)
+                case .nextChat: self.core.aiChatCoordinator.openAdjacentChat(-1)
+                case .newChat: self.core.aiChatCoordinator.startNewChat()
+                case .newChatWithModel:
+                    self.core.aiChatCoordinator.startNewChat()
+                    self.core.palette.requestAIModelPicker()
+                }
+                return true
+            }
+            guard command != nil else { return false }
             if self.core.palette.mode == .launcher || self.core.palette.mode == .clipboard,
                 let index = FavoriteSlots.index(forKeyCode: event.keyCode)
             {
@@ -300,7 +323,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
                 self.core.palette.prepare(mode: .launcher)
                 return true
             }
-            guard let character = Self.commandCharacter(from: event) else { return false }
+            guard let character = command else { return false }
             switch character {
             case ",":
                 self.core.settingsCoordinator.showSettings()

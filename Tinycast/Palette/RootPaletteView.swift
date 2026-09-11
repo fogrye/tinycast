@@ -333,6 +333,10 @@ struct RootPaletteView: View {
             .onChange(of: vm.pinChordToken) { pinSelection() }
             // ⌘1…⌘0 arrives as a slot index from AppKit keyCode matching.
             .onChange(of: vm.favoriteSlotToken) { activateFavoriteSlotShortcut() }
+            .onChange(of: vm.aiModelPickerToken) {
+                guard vm.mode == .ai else { return }
+                openAIModel()
+            }
             // One optional makes "exactly one menu" structural; this only mirrors it for the panel.
             .onChange(of: openMenu) {
                 vm.menuOpen = menuOpen
@@ -862,6 +866,10 @@ struct RootPaletteView: View {
             closeMenus()
             return
         }
+        openAIModel()
+    }
+
+    private func openAIModel() {
         let refreshTask = core.aiChatCoordinator.prepareModelSwitcher()
         let options = core.aiChatCoordinator.modelOptions
         let selected = core.aiSettings.defaultModel

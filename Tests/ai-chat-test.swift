@@ -38,9 +38,57 @@ struct AIChatTests {
         await theToolLoopRefusesToRunForever()
         await toolOutputIsBoundedBeforeItIsBilled()
         toolUsesPersistAndSettleOnReload()
+        chatShortcutKeys()
+        chatHistoryNavigation()
 
         print("\(passes) passed, \(failures) failed")
         if failures > 0 { exit(1) }
+    }
+
+    static func chatShortcutKeys() {
+        expect(
+            AIChatShortcut.resolve(character: "[", hasShift: false) == .previousChat,
+            "Cmd-[ opens the previous chat")
+        expect(
+            AIChatShortcut.resolve(character: "]", hasShift: false) == .nextChat,
+            "Cmd-] opens the next chat")
+        expect(
+            AIChatShortcut.resolve(character: "n", hasShift: false) == .newChat,
+            "Cmd-N starts a new chat")
+        expect(
+            AIChatShortcut.resolve(character: "m", hasShift: true) == .newChatWithModel,
+            "Cmd-Shift-M starts a new chat with model selection")
+    }
+
+    static func chatHistoryNavigation() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let newest = ChatConversation(
+            id: UUID(), title: "Newest", preview: "", createdAt: now, updatedAt: now, messageCount: 1)
+        let middle = ChatConversation(
+            id: UUID(), title: "Middle", preview: "", createdAt: now, updatedAt: now, messageCount: 1)
+        let oldest = ChatConversation(
+            id: UUID(), title: "Oldest", preview: "", createdAt: now, updatedAt: now, messageCount: 1)
+        let chats = [newest, middle, oldest]
+        let unsaved = UUID()
+
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: unsaved, offset: 1) == newest.id,
+            "Cmd-[ from a fresh chat opens the newest saved chat")
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: unsaved, offset: -1) == nil,
+            "Cmd-] from a fresh chat stays put")
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: newest.id, offset: 1) == middle.id,
+            "Cmd-[ moves from newest to older chat")
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: newest.id, offset: -1) == nil,
+            "Cmd-] at newest stays put")
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: oldest.id, offset: -1) == middle.id,
+            "Cmd-] moves from oldest to newer chat")
+        expect(
+            ChatHistoryNavigation.adjacent(in: chats, from: oldest.id, offset: 1) == nil,
+            "Cmd-[ at oldest stays put")
     }
 
     /// A reply that searched and called tools has to render them in the order they happened.
