@@ -74,22 +74,16 @@ enum ExtensionAsyncProcess {
         }
     }
 
-    /// An app bundle inherits no login shell, so a bare `brew` would otherwise fail.
-    static func resolveExecutable(_ command: String) -> URL? {
+    /// An app bundle inherits no login shell, so resolve against the extension runtime's PATH.
+    static func resolveExecutable(_ command: String, environment: [String: String]) -> URL? {
         let fileManager = FileManager.default
         if command.contains("/") {
             let expanded = (command as NSString).expandingTildeInPath
             return fileManager.isExecutableFile(atPath: expanded)
                 ? URL(fileURLWithPath: expanded) : nil
         }
-        let search =
-            (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
-            + [
-                "/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin",
-                "/sbin"
-            ]
-        for directory in search {
-            let candidate = (directory as NSString).appendingPathComponent(command)
+        for directory in (environment["PATH"] ?? "").split(separator: ":") {
+            let candidate = (String(directory) as NSString).appendingPathComponent(command)
             if fileManager.isExecutableFile(atPath: candidate) {
                 return URL(fileURLWithPath: candidate)
             }
@@ -97,13 +91,16 @@ enum ExtensionAsyncProcess {
         return nil
     }
 
-    static func run(_ spec: RenderValue?) async throws -> [String: Any] {
+    static func run(
+        _ spec: RenderValue?, environment defaultEnvironment: [String: String]
+    ) async throws -> [String: Any] {
         let fields = spec?.objectValue ?? [:]
         let command = fields["command"]?.stringValue ?? ""
         let useShell = fields["shell"]?.boolValue ?? false
         let args = (fields["args"]?.arrayValue ?? []).compactMap(\.stringValue)
         let cwd = fields["cwd"]?.stringValue
         let environment = (fields["env"]?.objectValue).map { $0.compactMapValues(\.stringValue) }
+            ?? defaultEnvironment
         let input = fields["input"]?.stringValue.flatMap { Data(base64Encoded: $0) }
         let timeout = fields["timeout"]?.doubleValue
         let detached = fields["detached"]?.boolValue ?? false
@@ -126,14 +123,14 @@ enum ExtensionAsyncProcess {
 
     private static func execute(
         command: String, useShell: Bool, args: [String], cwd: String?,
-        environment: [String: String]?, input: Data?, timeout: Double?, detached: Bool = false
+        environment: [String: String], input: Data?, timeout: Double?, detached: Bool = false
     ) throws -> [String: Any] {
         let task = Process()
         if useShell {
             task.executableURL = URL(fileURLWithPath: "/bin/sh")
             task.arguments = ["-c", command]
         } else {
-            guard let resolved = resolveExecutable(command) else {
+            guard let resolved = resolveExecutable(command, environment: environment) else {
                 throw ProcessError.notFound(command)
             }
             task.executableURL = resolved
@@ -142,7 +139,7 @@ enum ExtensionAsyncProcess {
         if let cwd, !cwd.isEmpty {
             task.currentDirectoryURL = URL(fileURLWithPath: (cwd as NSString).expandingTildeInPath)
         }
-        task.environment = environment ?? ProcessInfo.processInfo.environment
+        task.environment = environment
 
         let stdout = Pipe()
         let stderr = Pipe()

@@ -404,9 +404,9 @@ looked for, version managers included (Homebrew, Volta, asdf, mise, fnm, nvm, Ya
 
 That hardcoded list can never cover every toolchain layout — Nix among them — so the Registries sheet
 also has "Custom search paths": a `:`-separated list, `extensionCustomSearchPaths` in `AppSettings`,
-checked *before* the built-in list wherever it resolves a package manager or Node. Set once, it applies
-to every future install; nothing about it needs entering per-install. `ExtensionInstaller` takes it as
-`additionalSearchPaths` rather than reading settings itself, keeping the Model/Service split intact.
+checked *before* the built-in list when building an extension and when its child process resolves a bare
+executable. Set once, it applies to every later install and command launch; nothing needs entering per
+extension.
 
 Neither the registry list, the package manager, nor the custom search paths ride a settings backup:
 the first two name a tool or a source of code the machine an import lands on may not have or want, and

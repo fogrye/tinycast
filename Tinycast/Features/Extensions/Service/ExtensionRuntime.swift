@@ -4,6 +4,7 @@ import JavaScriptCore
 /// The JS→Swift seam. Answers are JSON, so nothing non-`Sendable` crosses back to the JS queue.
 @MainActor
 protocol ExtensionHostAPI: AnyObject, Sendable {
+    func configure(processEnvironment: [String: String])
     func perform(api: String, method: String, arguments: [RenderValue]) async throws -> String
 }
 
@@ -58,6 +59,7 @@ final class ExtensionRuntime: @unchecked Sendable {
 
     /// Idempotent, so any command can lazily ensure the engine is up.
     func boot(config: ExtensionBootConfig) async throws {
+        await hostAPI.configure(processEnvironment: config.environmentVariables)
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 do {
@@ -77,6 +79,8 @@ final class ExtensionRuntime: @unchecked Sendable {
                 ?? Bundle.main.url(forResource: "RaycastRuntime.generated", withExtension: "js"),
             let source = try? String(contentsOf: url, encoding: .utf8)
         else { throw RuntimeError.runtimeResourceMissing }
+
+        nodeShims.configure(processEnvironment: config.environmentVariables)
 
         guard let context = JSContext() else { throw RuntimeError.bootFailed("no JSContext") }
 

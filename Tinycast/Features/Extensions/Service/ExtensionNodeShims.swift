@@ -4,7 +4,11 @@ import Foundation
 /// Answered inline on the JS queue, so a blocking answer can never deadlock the UI.
 final class ExtensionNodeShims: @unchecked Sendable {
     private let fileManager = FileManager.default
+    private var processEnvironment = ProcessInfo.processInfo.environment
 
+    func configure(processEnvironment: [String: String]) {
+        self.processEnvironment = processEnvironment
+    }
     /// Returns the JSON envelope `{ok, value}` / `{ok:false, error, code}` the JS side unwraps.
     func perform(api: String, method: String, argsJSON: String) -> String {
         let arguments = ExtensionRuntime.jsonArray(from: argsJSON)
@@ -214,12 +218,16 @@ final class ExtensionNodeShims: @unchecked Sendable {
         guard !command.isEmpty else { throw ShimError.failed("No command given.", "EINVAL") }
         let useShell = spec["shell"] as? Bool ?? false
 
+        let environment = (spec["env"] as? [String: Any])?.compactMapValues { $0 as? String }
+            ?? processEnvironment
         let task = Process()
         if useShell {
             task.executableURL = URL(fileURLWithPath: "/bin/sh")
             task.arguments = ["-c", command]
         } else {
-            guard let resolved = ExtensionAsyncProcess.resolveExecutable(command) else {
+            guard let resolved = ExtensionAsyncProcess.resolveExecutable(
+                command, environment: environment)
+            else {
                 throw ShimError.noEntry(command, "spawn")
             }
             task.executableURL = resolved
@@ -228,11 +236,7 @@ final class ExtensionNodeShims: @unchecked Sendable {
         if let cwd = spec["cwd"] as? String, !cwd.isEmpty {
             task.currentDirectoryURL = URL(fileURLWithPath: (cwd as NSString).expandingTildeInPath)
         }
-        if let overrides = spec["env"] as? [String: String] {
-            task.environment = overrides
-        } else {
-            task.environment = ProcessInfo.processInfo.environment
-        }
+        task.environment = environment
 
         let stdout = Pipe()
         let stderr = Pipe()
