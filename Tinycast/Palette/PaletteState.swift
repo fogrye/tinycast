@@ -23,6 +23,8 @@ final class PaletteState {
     private(set) var pinChordToken = UUID()
     /// Bumped when AppKit resolves ⌘1…⌘0 to a slot index from the physical number row.
     private(set) var favoriteSlotToken = UUID()
+    /// Bumped when ⌘⇧M asks the chat header to open its model picker.
+    private(set) var aiModelPickerToken = UUID()
     /// The last slot index from `noteFavoriteSlot`, consumed by the SwiftUI layer.
     private(set) var favoriteSlotIndex: Int?
     /// Set by the compact bar's overflow to expand without a query; cleared by `prepare`.
@@ -92,6 +94,10 @@ final class PaletteState {
     func noteFavoriteSlot(_ index: Int) {
         favoriteSlotIndex = index
         favoriteSlotToken = UUID()
+    }
+
+    func requestAIModelPicker() {
+        aiModelPickerToken = UUID()
     }
 
     func noteCommandHeld(_ held: Bool) {

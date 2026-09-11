@@ -207,7 +207,8 @@ so the header never has to fit a third control beside the switcher.
 
 The second footer control is the palette's normal Actions (`⌘K`) menu. It owns New Chat, Chat History
 and AI Settings, plus Stop Response and Copy Last Response when those actions apply. Chat adds no
-separate footer design and no independent window.
+separate footer design and no independent window. `⌘[` / `⌘]` open older / newer saved chats, `⌘N`
+starts a new chat, and `⇧⌘M` starts one then opens the model picker.
 
 `AIChatState` turns provider-neutral stream events into one live assistant message. Thinking state is
 shown without entering the transcript, partial text is preserved on failure, cancellation invalidates
