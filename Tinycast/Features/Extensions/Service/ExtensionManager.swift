@@ -36,6 +36,7 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     let appearances = ExtensionAppearanceStore()
     @ObservationIgnored private let runtime: ExtensionRuntime
     @ObservationIgnored private let bridge: ExtensionHostBridge
+    @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let oauthSession = ExtensionOAuthSession()
     @ObservationIgnored private weak var appIndex: AppIndex?
     @ObservationIgnored private weak var coordinator: ExtensionCoordinator?
@@ -47,7 +48,8 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
     @ObservationIgnored private var nextToastID = 1
     @ObservationIgnored private var lastOAuthExtensionName: String?
 
-    init(clipboardStore: ClipboardStore) {
+    init(clipboardStore: ClipboardStore, settings: AppSettings) {
+        self.settings = settings
         storage = ExtensionStorage(directory: ExtensionCatalog.storageDirectory())
         bridge = ExtensionHostBridge(clipboardStore: clipboardStore)
         runtime = ExtensionRuntime(hostAPI: bridge)
@@ -300,7 +302,11 @@ final class ExtensionManager: ExtensionRuntimeDelegate, ExtensionHostContext {
 
         do {
             // No-op while a context is already up; after `stop()` this builds a fresh one.
-            try await runtime.boot(config: .current(supportDirectory: supportPath))
+            try await runtime.boot(
+                config: .current(
+                    supportDirectory: supportPath,
+                    additionalSearchPaths:
+                        settings.extensionCustomSearchPaths + ExtensionPackageManager.searchPaths))
         } catch {
             state = .failed(error.localizedDescription)
             return

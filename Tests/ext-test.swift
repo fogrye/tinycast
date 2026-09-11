@@ -26,6 +26,11 @@ struct ExtensionTests {
         var huds: [String] = []
         var oauthTokens: [String: String] = [:]
         private let fetcher = ExtensionFetcher()
+        private var processEnvironment = ProcessInfo.processInfo.environment
+
+        func configure(processEnvironment: [String: String]) {
+            self.processEnvironment = processEnvironment
+        }
 
         func perform(api: String, method: String, arguments: [RenderValue]) async throws -> String {
             calls.append("\(api).\(method)")
@@ -39,7 +44,8 @@ struct ExtensionTests {
                     )
                 }
                 return ExtensionRuntime.jsonString(
-                    from: try await ExtensionAsyncProcess.run(arguments.first))
+                    from: try await ExtensionAsyncProcess.run(
+                        arguments.first, environment: processEnvironment))
             }
             if api == "fetch" {
                 return ExtensionRuntime.jsonString(from: try await fetcher.request(arguments.first))
@@ -893,8 +899,52 @@ struct ExtensionTests {
             failingRecorder.failures.joined(separator: "|"))
         await failing.stop(session: "s3")
 
+        await runtimePathChecks()
         await swiftHelperChecks()
+
         zlibChecks()
+    }
+
+    /// Both child-process bridges must resolve the runtime's configured PATH.
+    @MainActor
+    static func runtimePathChecks() async {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-runtime-path-\(UUID().uuidString)")
+        let executable = directory.appendingPathComponent("tinycast-runtime-tool")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? Data("#!/bin/sh\nprintf '%s' \"$1\"\n".utf8).write(to: executable)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+        let (runtime, _, recorder) = makeRuntime()
+        try? await runtime.boot(
+            config: .current(
+                supportDirectory: FileManager.default.temporaryDirectory,
+                additionalSearchPaths: [directory.path]))
+        let command = """
+            "use strict";
+            const { Detail } = require("@raycast/api");
+            const { execFile, execFileSync } = require("child_process");
+            const React = require("react");
+            module.exports.default = function Command() {
+              const [state, setState] = React.useState("pending");
+              React.useEffect(() => {
+                const sync = execFileSync("tinycast-runtime-tool", ["sync"], { encoding: "utf8" }).trim();
+                execFile("tinycast-runtime-tool", ["async"], { encoding: "utf8" }, (error, stdout) =>
+                  setState(error ? error.message : sync + "|" + stdout.trim()));
+              }, []);
+              return React.createElement(Detail, { markdown: state });
+            };
+            """
+        await runtime.start(
+            session: "sPath", code: command, file: URL(fileURLWithPath: "/tmp/runtime-path.js"),
+            mode: .view, context: launchContext())
+        await settle(1200)
+        check(
+            "configured PATH resolves sync and async child processes",
+            recorder.trees.last?.activeRoot?.string("markdown") == "sync|async",
+            recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
+        await runtime.stop(session: "sPath")
     }
 
     /// Raycast's `swift:` wrapper chmods its bundled helper before spawning it: store zips ship it 644.

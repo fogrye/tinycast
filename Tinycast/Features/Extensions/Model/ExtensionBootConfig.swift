@@ -14,17 +14,20 @@ struct ExtensionBootConfig: Sendable {
     var totalMemory: Double
     var environmentVariables: [String: String]
 
-    static func current(supportDirectory: URL) -> ExtensionBootConfig {
+    static func current(
+        supportDirectory: URL, additionalSearchPaths: [String] = []
+    ) -> ExtensionBootConfig {
         let info = ProcessInfo.processInfo
         var arch = "arm64"
         #if arch(x86_64)
             arch = "x64"
         #endif
-        // A GUI app inherits a bare environment; extensions shelling out expect a login-ish PATH.
         var variables = info.environment
-        variables["PATH"] =
-            (variables["PATH"].map { $0 + ":" } ?? "")
-            + "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        var seen = Set<String>()
+        let paths = additionalSearchPaths
+            + (variables["PATH"] ?? "").split(separator: ":").map(String.init)
+        variables["PATH"] = paths.filter { !$0.isEmpty && seen.insert($0).inserted }
+            .joined(separator: ":")
         variables["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
 
         return ExtensionBootConfig(

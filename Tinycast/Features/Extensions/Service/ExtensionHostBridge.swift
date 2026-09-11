@@ -120,9 +120,14 @@ final class ExtensionHostBridge: ExtensionHostAPI {
     weak var context: ExtensionHostContext?
     private let clipboardStore: ClipboardStore
     private let fetcher = ExtensionFetcher()
+    private var processEnvironment = ProcessInfo.processInfo.environment
 
     init(clipboardStore: ClipboardStore) {
         self.clipboardStore = clipboardStore
+    }
+
+    func configure(processEnvironment: [String: String]) {
+        self.processEnvironment = processEnvironment
     }
 
     func perform(api: String, method: String, arguments: [RenderValue]) async throws -> String {
@@ -139,7 +144,9 @@ final class ExtensionHostBridge: ExtensionHostAPI {
         case "feedback": return try await feedback(method: method, arguments: arguments)
         case "system": return try await system(method: method, arguments: arguments)
         case "fetch": return try await fetcher.request(arguments.first)
-        case "proc": return try await ExtensionAsyncProcess.run(arguments.first)
+        case "proc":
+            return try await ExtensionAsyncProcess.run(
+                arguments.first, environment: processEnvironment)
         case "oauth": return try await oauth(method: method, arguments: arguments)
         default: throw ExtensionHostError.unknown("\(api).\(method)")
         }
